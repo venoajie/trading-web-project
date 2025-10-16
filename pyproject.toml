@@ -1,0 +1,36 @@
+
+[project]
+name = "trading_app"
+version = "0.1.0"
+description = "Portfolio and asset management web service."
+authors = [{ name = "AI Solutions Architect Team" }]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.117.1",
+    "uvicorn[standard]==0.30.5",
+    "sqlalchemy==2.0.31",
+    "asyncpg==0.30.0",
+    "pydantic==2.11.5",
+    "pydantic-settings==2.3.0",
+    "python-dotenv==1.0.1",
+    "alembic==1.13.2",
+    "orjson==3.10.18",
+    "loguru==0.7.2",
+    "aiohttp==3.12.7",  # For Librarian client
+    "redis==5.0.4",
+    # Security - JWTs and password hashing
+    "python-jose[cryptography]==3.3.0",
+    "passlib[bcrypt]==2024.7.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.4.0",
+    "pytest-asyncio==0.23.8",
+    "httpx==0.27.0", # Modern async client for testing FastAPI
+    "black==24.4.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"

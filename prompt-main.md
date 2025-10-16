@@ -1,168 +1,283 @@
-Of course. I will now re-execute my original mandate.
 
-Let's reason step by step, synthesizing our entire conversation into a final, definitive plan and a robust, effective prompt for an AI to execute.
-
-### **Reasoning Step-by-Step**
-
-Our initial goal was to create a web app for a solo developer. Through our conversation, several critical constraints and preferences emerged that have fundamentally shaped the architecture:
-
-1.  **Data Volume Constraint:** The initial idea of using a single OCI Autonomous Database is not viable. Your market data (at ~1 GB/day) would quickly exceed the 20 GB Free Tier limit. This necessitates a separate storage solution for high-volume, time-series data.
-2.  **Disaster Recovery & Vendor Lock-in:** You expressed a valid concern about relying on a single cloud provider, especially on a free tier. This requires a robust, multi-cloud backup strategy for your critical user data.
-3.  **Solo Developer Ergonomics:** The technology stack must be productive, well-documented, and not require a steep learning curve. The development process must support an MVP-first, iterative rollout.
-4.  **Specific Feature Requirements:** We have confirmed the need for a persistent AI chat sidebar, placeholder legal pages, a consent mechanism, and a clear monetization strategy (premium features).
-5.  **Data Governance:** You need a structured way to manage the sources and licenses of your RAG data to mitigate legal risks.
-
-These points have led us to a more sophisticated and resilient architecture than originally envisioned.
-
----
-
-### **Three Architectural Approaches (Updated)**
-
-Here are three approaches evaluated against your now fully-defined requirements.
-
-#### **Approach 1: All-in-One Monolith on a Single VM**
-
-*   **Description:** Install and run all services (FastAPI, PostgreSQL, Redis) directly on the OCI VM.
-*   **Pros:** Simplest initial setup.
-*   **Cons:** Fails on every critical requirement. No solution for data volume, no disaster recovery, poor scalability, and high maintenance burden. **This is not a viable option.**
-
-#### **Approach 2: Single Database Cloud-Native**
-
-*   **Description:** Use the OCI VM for containerized applications (FastAPI, Redis, Nginx) and the OCI Autonomous Database for *all* data (user and market).
-*   **Pros:** Excellent separation of concerns, managed database for user data is secure.
-*   **Cons:** **Fails the data volume constraint.** The 20 GB database limit makes it unsuitable for your market data needs. It also does not address the multi-cloud disaster recovery requirement.
-
-#### **Approach 3: Hybrid Database, Multi-Cloud DR Architecture (Recommended)**
-
-*   **Description:** A multi-service, multi-database architecture designed for resilience and scalability, precisely tailored to your requirements.
-    *   **OCI VM:** Runs containerized, stateless services (Trading App API, Librarian API, Redis, Nginx) and a dedicated, high-volume database for market data (TimescaleDB). It also runs the automated backup script.
-    *   **OCI Autonomous Database:** Used exclusively for low-volume, high-importance, critical user data.
-    *   **OCI Object Storage:** Hosts the static frontend, raw RAG source files, and potentially archived market data.
-    *   **External Cloud Provider (e.g., AWS/GCP):** Acts as a secure, off-site target for nightly, encrypted backups of your critical user data.
-*   **Pros:**
-    *   **Solves Data Volume:** Uses the VM's 100 GB storage with TimescaleDB's compression for market data.
-    *   **Provides True Disaster Recovery:** Your critical user data is backed up to another provider, protecting you from single-platform risk.
-    *   **Uses the Right Tool for the Job:** A managed DB for critical data, a time-series DB for market data.
-    *   **Highly Scalable and Modular:** Perfectly supports your MVP-first, iterative development plan.
-*   **Cons:** Highest initial setup complexity, but this one-time investment directly addresses all of your stated long-term concerns.
-
----
-
-### **Recommendation**
-
-We will proceed with **Approach 3: Hybrid Database, Multi-Cloud DR Architecture**. It is the only approach that professionally and comprehensively solves all the challenges and requirements we have discussed.
-
----
-
-### **The Final, Synthesized Prompt**
-
-This prompt is the culmination of our entire conversation. It is detailed, specific, and structured to be executed by another AI to build the application exactly as we have designed it.
-
-```prompt
 ### ROLE
-You are an expert full-stack development team, comprised of a Senior Python Developer, a Frontend Specialist, and a Cloud Infrastructure Engineer. Your task is to generate the complete code, configuration, and step-by-step instructions for a sophisticated, multi-service web application.
+You are a Principal Solutions Architect and AI Project Lead. Your primary responsibility is to orchestrate the end-to-end development of a new, secure, and production-grade web service. You must ensure that every component integrates perfectly within a pre-existing, complex cloud ecosystem and adheres to the highest standards of software engineering. You will generate code, configuration, and deployment artifacts by delegating tasks to a team of virtual specialists as needed.
 
 ### OBJECTIVE
-Build a secure, scalable, and maintainable web application for trading and portfolio asset management, designed for an MVP-first, iterative rollout. The architecture must be resilient, addressing specific constraints around data volume and disaster recovery, and tailored for a solo developer.
+Build the "Trading App," a secure, scalable, and maintainable web application for portfolio and asset management. The architecture MUST integrate with an existing data pipeline and a dedicated RAG service, adhering to all documented infrastructure constraints and development patterns provided in the context.
 
 ### GUIDING PRINCIPLES
-- **Security First:** Implement a "Defense in Depth" strategy at every layer.
-- **Solo Developer Ergonomics:** Prioritize technologies and patterns that are well-documented, have large communities, and maximize productivity.
-- **MVP & Iteration:** The plan must be structured in "vertical slices" of functionality, allowing for a gradual, feature-by-feature rollout.
-- **Decoupled & Scalable:** All components must be modular and communicate via APIs, enabling independent development, deployment, and future scaling.
+- **Security First:** Remediate all known vulnerabilities before implementing new features. Implement a "Defense in Depth" strategy.
+- **Ecosystem Integration:** The new application is a component in a larger system. It MUST adhere to all existing architectural patterns, data contracts, and infrastructure constraints.
+- **Backend First, Contract-Driven:** The backend API is the foundation. It must be robust, secure, and fully tested. The API's generated OpenAPI specification serves as the formal, non-negotiable contract for frontend development.
 
-### CORE ARCHITECTURE (Hybrid Database, Multi-Cloud DR)
-- **Compute (OCI VM):** A single VM (3 CPU, 18GB RAM, 100GB Storage) running Docker and Docker Compose to orchestrate:
-  1.  `trading_app`: FastAPI service for all user-facing business logic.
-  2.  `librarian`: Standalone FastAPI service for all public RAG queries.
-  3.  `timescaledb`: PostgreSQL container with the TimescaleDB extension for high-volume market data, using a persistent volume on the VM's local storage.
-  4.  `redis`: For caching and job queuing.
-  5.  `nginx`: Secure reverse proxy and SSL termination.
-  6.  A `cron` job for running automated maintenance scripts.
-- **Primary Database (OCI Autonomous Database):** A managed, PostgreSQL-compatible database used exclusively for low-volume, critical `app_data` (users, transactions, payments, etc.).
-- **Disaster Recovery Target (External Cloud):** An object storage bucket (e.g., AWS S3, Google Cloud Storage) to receive nightly, encrypted backups of the critical user data from the OCI Autonomous DB.
+### MANDATORY DELIVERABLES & STANDARDS
+1.  **API as a Contract:** Every API endpoint you create MUST be documented via auto-generated OpenAPI 3.1+ schemas (native to FastAPI). The generated `openapi.json` is a required artifact at the end of the backend development phase.
+2.  **Test-Driven Backend:** All backend business logic MUST be accompanied by a comprehensive test suite. Use the `pytest` framework with `pytest-asyncio`. A minimum of unit tests for services and integration tests for API endpoints is required.
+3.  **Type-Safe Configuration:** All application settings (database URLs, API keys, etc.) MUST be managed through Pydantic's `SettingsDict` and loaded from environment variables (`.env` file). Hardcoding secrets is forbidden.
+4.  **Database Migrations:** All database schema changes, including the initial setup, MUST be managed via Alembic. Raw `.sql` scripts for schema modification are forbidden.
+
+### CORE ARCHITECTURE (Context-Aware Integration)
+- **Deployment Host (OCI VM `shared-prod-vm-database`):** The new `trading_app` service will be deployed here via Docker Compose.
+- **Docker Orchestration:**
+    - The new `trading_app` container will join the existing external Docker network named `central-data-platform`.
+    - All services will use a `wait-for.sh` script to manage startup dependencies.
+- **Database Connectivity (MANDATORY):**
+    - The application MUST connect to the central PostgreSQL database via the **PgBouncer** service at `pgbouncer:6432`. Direct connections to `postgres:5432` are forbidden.
+- **Data Architecture:**
+    - **Read-Only Data:** The app will have read-only access to tables populated by the existing market data pipeline (e.g., `public_trades`, `ohlc`, `instruments`).
+    - **Writeable Data:** The app will own and manage new schemas/tables for user-specific data (e.g., `user_transactions`, `user_portfolios`, `users`).
+- **RAG Integration:**
+    - The application is a **thin client** for RAG. It MUST NOT contain any embedding models or vector search logic.
+    - All context-aware AI features will be powered by making secure API calls to the existing, standalone **Librarian Service** (reachable at the hostname `librarian`).
 - **Static & Raw Data Storage (OCI Object Storage):**
-  1.  Hosts the compiled, static React frontend files.
-  2.  Stores raw source documents (PDFs, TXT files) for the RAG pipeline.
+    - Hosts the compiled, static React frontend files.
 
 ### TECHNOLOGY STACK
-- **Backend:** Python 3.13+, FastAPI, SQLAlchemy 2.0 (async), Pydantic.
-- **Python Libraries:** `uvloop`, `asyncpg`, `orjson`, `loguru`, `pydantic-settings`, `python-dotenv`, `redis`, `pgvector`, `sentence-transformers`, `oci`.
-- **Databases:** PostgreSQL 17, TimescaleDB, Redis.
-- **Frontend:** React with Vite, Mantine (for UI components), Zustand (for global state), Axios (for API calls).
-- **DevOps:** Docker, Docker Compose, Nginx, Let's Encrypt, `pg_dump`.
+- **Backend:** Python >=3.12+, FastAPI, SQLAlchemy 2.0 (async), Pydantic, **Alembic**.
+- **Python Libraries:** `uvloop>=0.21.0`,`fastapi==0.117.1`, `sqlalchemy==2.0.31`, `asyncpg==0.30.0`, `orjson==3.10.18`, `loguru==0.7.2 or structlog==25.4`, `pydantic==2.11.5`, `pydantic-settings==2.3.0`, `python-dotenv`, `redis==5.0.4`, `aiohttp==3.12.7`, `pytest>=7.0`, `pytest-asyncio>=0.20.0`, `tomli==2.0.1`, `aiohttp` (for testing).   
+- **Database:** PostgreSQL 17 (via PgBouncer).
+- **Frontend:** React with Vite, Mantine, Zustand, Axios.
+- **DevOps:** Docker, Docker Compose, Nginx, Let's Encrypt.
 
 ### DETAILED IMPLEMENTATION BLUEPRINT
 
-Execute this plan in phased, vertical slices. Wait for confirmation after each major phase.
+Execute this plan in phased, vertical slices. Confirm completion of each phase before proceeding.
 
-#### **Phase 1: Foundational Backend & User Core (MVP Slice 1)**
+#### **Phase 0: Security Remediation & Foundational Setup**
 
-**Step 1.1: Project Scaffolding**
-Create separate directories for `trading_app` and `librarian`, each with its own `pyproject.toml` (using Poetry), `Dockerfile`, and `app` directory structure.
+**Step 0.1: Project Scaffolding & Tooling**
+-   **Task:** Create the `trading_app` directory structure.
+-   **Deliverables:**
+    1.  `trading_app/` directory with `app/` and `tests/` subdirectories.
+    2.  `pyproject.toml` file configured for `uv`, defining all dependencies, including `pytest`.
+    3.  A `Dockerfile, using a multi-stage build for a lean production image.
+    4.  A basic `tests/conftest.py` to set up the async test client.
 
-**Step 1.2: The Trading App - User Core**
--   **Database Models (SQLAlchemy for OCI Autonomous DB):** Generate models for the `app_data` schema based on this design:
-    -   `users`: With `email`, `hashed_password` (using Bcrypt), `subscription_tier`, `preferences` (JSONB), and `is_verified` (boolean).
-    -   `payment_history`: To store non-sensitive transaction IDs from payment providers.
-    -   `transactions`: For user's manual trade entries.
-    -   `ai_conversations`: To store user chat history.
--   **API Endpoints:** Implement the user core:
-    -   `/auth/register` and `/auth/login` using JWTs.
-    -   A protected `/users/me` endpoint.
+**Step 0.2: Implement Database Migrations**
+-   **Task:** Integrate **Alembic** into the project for asynchronous operation.
+-   **Deliverables:**
+    1.  A fully configured `alembic/` directory.
+    2.  The initial Alembic migration script that creates the tables for the `users`, `user_transactions`, `user_portfolios`, and `ai_conversations` models.
 
-#### **Phase 2: Data Management, Governance, and Disaster Recovery**
+#### **Phase 1: Backend User Core**
 
-**Step 2.1: RAG Data Governance**
--   Generate the SQL schema for a `data_asset_catalog` table in the TimescaleDB database. This table must track `asset_uri` (link to OCI Object Storage), `source_name`, `license_type`, and a `usage_permissions` JSONB field.
--   The Librarian service's logic must be designed to query this catalog first to determine which documents are permissible to index.
+**Step 1.1: Database Models**
+-   **Task:** Generate the data models for a new `app_data` schema.
+-   **Deliverables:**
+    1.  Pydantic models for API data contracts.
+    2.  Asynchronous SQLAlchemy 2.0 ORM models for `users`, `user_transactions`, `user_portfolios`, and `ai_conversations`.
 
-**Step 2.2: The Librarian Service**
--   Implement the `librarian` service with two endpoints:
-    -   `GET /api/v1/health`: A detailed health check.
-    -   `POST /api/v1/context`: A secure endpoint that takes a query, performs a vector search against the RAG index in TimescaleDB, and returns context.
+**Step 1.2: API Endpoints & Testing**
+-   **Task:** Implement the user authentication and management API.
+-   **Deliverables:**
+    1.  API routers for `/auth/register` and `/auth/login` using JWTs.
+    2.  A protected `/users/me` endpoint.
+    3.  Full CRUD endpoints for `/transactions` operating on the `user_transactions` table.
+    4.  A complete suite of unit and integration tests covering the authentication logic and all transaction endpoints.
+    5.  The generated `openapi.json` file as a committed artifact.
 
-**Step 2.3: Disaster Recovery Script**
--   Generate a bash script `backup_user_data.sh`. This script must:
-    1.  Use `pg_dump` to connect to the OCI Autonomous DB and export the `app_data` schema.
-    2.  Compress and encrypt the backup file.
-    3.  Use an external cloud provider's CLI (e.g., `aws s3 cp`) to upload the file.
-    4.  Be parameterized with environment variables for all secrets.
+#### **Phase 2: RAG Integration & Frontend Shell**
 
-#### **Phase 3: Frontend Shell & First Useful Feature (MVP Slice 2)**
+**Step 2.1: Librarian Service Client**
+-   **Task:** Create a robust, async API client for the Librarian Service.
+-   **Deliverables:**
+    1.  A `librarian_client.py` module with an `AsyncClient` that securely handles the API key.
+    2.  A new endpoint `/ai/chat` in the `trading_app` that proxies requests to the Librarian.
+    3.  Integration tests that mock the Librarian API and verify the proxy endpoint's behavior.
 
-**Step 3.1: Frontend Scaffolding**
--   Initialize a React project using Vite.
--   Set up the main application layout (`AppLayout.jsx`) which must be **fully responsive (mobile-first)**. This layout will contain:
-    1.  A main navigation area.
-    2.  A central content area.
-    3.  A **persistent, vertical AI Assistant Sidebar** on the right, whose state is managed globally by a **Zustand** store.
+**Step 2.2: Frontend Scaffolding**
+-   **Task:** Initialize the React project shell.
+-   **Deliverables:**
+    1.  A responsive React project using Vite, Mantine, and `react-router-dom`.
+    2.  The main `AppLayout.jsx` with a main content area and a persistent AI Assistant Sidebar.
+    3.  A global `Zustand` store to manage UI state (e.g., sidebar visibility).
 
-**Step 3.2: Legal & Consent Placeholders**
--   Create placeholder pages for `/terms-of-service` and `/privacy-policy`.
--   Add a global footer with links to these pages.
--   On the registration page, add a **mandatory consent checkbox** that links to these policies.
+**Step 2.3: Legal & Consent Placeholders**
+-   **Task:** Create placeholder legal pages and registration consent.
+-   **Deliverables:**
+    1.  Placeholder pages for `/terms-of-service` and `/privacy-policy`.
+    2.  A mandatory consent checkbox on the registration form.
 
-**Step 3.3: Implement the Transactions Feature**
--   **Backend:** Implement the full CRUD API endpoints for `/transactions` in the `trading_app`.
--   **Frontend:** Create a `TransactionsPage.jsx` that allows users to manually enter and view their trades in a table.
--   **Navigation:** Add a link to this page. For all other features ("Portfolio", "Strategy"), the links should point to simple placeholder pages with a "Coming Soon!" message.
+#### **Phase 3: First Useful Features**
+
+**Step 3.1: Frontend Transactions Feature**
+-   **Task:** Build the UI for managing trade entries.
+-   **Deliverables:**
+    1.  A `TransactionsPage.jsx` that performs authenticated CRUD operations against the `/transactions` API endpoint.
+    2.  A form for creating/editing transactions and a data table for displaying them.
+
+**Step 3.2: Frontend AI Chat Integration**
+-   **Task:** Connect the AI sidebar to the backend.
+-   **Deliverables:**
+    1.  A functional chat interface in the AI sidebar.
+    2.  Logic to call the `/ai/chat` backend endpoint and display the response from the Librarian service.
 
 #### **Phase 4: Orchestration & Deployment**
 
-**Step 4.1: Docker Compose**
--   Create the master `docker-compose.yml` file. It must define all services (`nginx`, `trading_app`, `librarian`, `timescaledb`, `redis`).
--   Use Docker volumes for persistent TimescaleDB data.
--   Use separate `.env` files for each service's configuration.
+**Step 4.1: Docker Compose Integration**
+-   **Task:** Create the Docker Compose configuration for the `trading_app`.
+-   **Deliverables:**
+    1.  A `docker-compose.yml` file defining the `trading_app` service.
+    2.  Configuration to connect to the external `central-data-platform` network.
+    3.  Use of `wait-for.sh` to ensure `pgbouncer:6432` is available before starting.
 
 **Step 4.2: Nginx Configuration**
--   Configure Nginx as a secure reverse proxy.
--   Implement SSL termination using Let's Encrypt.
--   Route `/api/trading/` to the `trading_app` and `/api/librarian/` to the `librarian`.
--   Implement security headers and rate limiting.
+-   **Task:** Generate the Nginx reverse proxy configuration.
+-   **Deliverables:**
+    1.  A production-grade `nginx.conf` file.
+    2.  Configuration to route `/api/` to the `trading_app` service and `/` to the static React files.
+    3.  Implementation of SSL termination, strong security headers, and rate limiting.
 
 **Step 4.3: Deployment Script**
--   Create a `deploy.sh` script to automate the entire deployment process on the OCI VM: pull code, build/recreate Docker containers, build the React app, and sync the static assets to OCI Object Storage.
+-   **Task:** Create a deployment automation script.
+-   **Deliverables:**
+    1.  A `deploy.sh` script that automates:
+        - Pulling the latest code.
+        - Building the `linux/arm64` Docker image.
+        - Recreating the Docker container via `docker compose up`.
+        - Running Alembic migrations (`alembic upgrade head`).
+        - Building the React application.
+        - Syncing static assets to their serving location.
 
-Begin with Phase 1, Step 1.1: Project Scaffolding.
-```
+Begin with Phase 0, Step 0.1:  Project Scaffolding & Tooling.
+
+
+**Artifacts**
+Example of my working Dockerfile:
+# src\services\executor\Dockerfile
+
+# Stage 1: Base with UV - common for all stages
+FROM python:3.13-slim AS base
+ENV UV_VENV=/opt/venv
+RUN python -m pip install --no-cache-dir uv \
+    && python -m uv venv ${UV_VENV}
+ENV PATH="${UV_VENV}/bin:$PATH"
+
+# Stage 2: Builder for dependencies
+FROM base AS builder
+WORKDIR /app
+
+# Copy dependency definitions
+# The executor depends on the shared library
+COPY src/shared/pyproject.toml ./src/shared/
+COPY src/services/executor/pyproject.toml ./src/services/executor/
+
+# Install dependencies using uv
+RUN uv pip install --no-cache-dir -e ./src/shared -e ./src/services/executor
+
+# Stage 3: Runtime image
+FROM base AS runtime
+
+# Install netcat for the wait-for-pg.sh script
+RUN apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
+RUN groupadd -r appuser --gid=1000 && \
+    useradd -r -g appuser --uid=1000 appuser
+
+# Copy virtual environment from builder
+COPY --from=builder ${UV_VENV} ${UV_VENV}
+
+# Copy application code
+WORKDIR /app
+COPY --chown=appuser:appuser ./src ./src
+COPY --chown=appuser:appuser ./core ./core
+
+# Set environment variables
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPYCACHEPREFIX=/tmp/.pycache \
+    SERVICE_NAME=executor
+
+# Copy and prepare the wait script
+COPY wait-for.sh /usr/local/bin/wait-for.sh
+RUN chmod +x /usr/local/bin/wait-for.sh
+
+USER appuser
+
+# Set the entrypoint to wait for pgbouncer
+ENTRYPOINT ["wait-for.sh", "pgbouncer:6432", "redis:6379", "--"]
+
+# Define the entrypoint
+CMD ["python", "src/services/executor/deribit/main.py"]
+
+# Dockerfile
+
+# Stage 1: Base with UV and a Virtual Environment
+FROM python:3.12-slim AS base
+
+ENV UV_VENV=/opt/venv
+RUN python -m pip install --no-cache-dir uv \
+    && python -m uv venv ${UV_VENV}
+ENV PATH="${UV_VENV}/bin:$PATH"
+
+# Stage 2: Builder - Install dependencies with build tools
+FROM base AS builder
+# Install build tools only where needed
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+
+COPY pyproject.toml .
+# --- OPTIMIZATION 1: Install CPU-only PyTorch ---
+RUN uv pip install torch --extra-index-url https://download.pytorch.org/whl/cpu && \
+    uv pip install --no-cache --strict .
+
+# --- OPTIMIZATION 2: Dedicated, minimal model downloader stage ---
+FROM base AS model_downloader
+ARG EMBEDDING_MODEL_NAME
+ARG RERANKER_MODEL_NAME # NEW: Add reranker model arg
+ARG HF_HOME=/opt/huggingface_cache
+ENV HUGGINGFACE_HUB_CACHE=${HF_HOME}
+# Install only the single library needed to download the models
+RUN uv pip install sentence-transformers==3.0.1
+# Download the embedding model
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${EMBEDDING_MODEL_NAME}', cache_folder='${HF_HOME}')"
+# NEW: Download the reranker model
+RUN python -c "from sentence_transformers import CrossEncoder; CrossEncoder('${RERANKER_MODEL_NAME}')"
+
+# Stage 3: Runtime - Final, lean image
+FROM base AS runtime
+
+# --- ALL ROOT-LEVEL SETUP HAPPENS FIRST ---
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r appuser --gid=1001 && \
+    useradd -r -m -g appuser --uid=1001 appuser
+
+RUN mkdir -p /app && \
+    mkdir -p /data/chroma
+
+# Copy the lean virtual environment from the builder stage
+COPY --from=builder ${UV_VENV} ${UV_VENV}
+
+# Copy the pre-downloaded model cache from our new minimal downloader
+ARG HF_HOME=/opt/huggingface_cache
+ENV HUGGINGFACE_HUB_CACHE=${HF_HOME}
+COPY --from=model_downloader ${HF_HOME} ${HF_HOME}
+
+# Copy the application code
+COPY ./app /app/app
+
+# Set ownership for ALL application-related files and directories at once
+RUN chown -R appuser:appuser /app /data /opt/venv ${HF_HOME}
+
+# --- END OF ROOT-LEVEL SETUP ---
+USER appuser
+WORKDIR /app
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPYCACHEPREFIX=/tmp/.pycache
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+  CMD ["curl", "-f", "http://localhost:8000/api/v1/health"]
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
