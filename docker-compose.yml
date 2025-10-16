@@ -1,0 +1,39 @@
+
+services:
+  trading_app:
+    # Build the image from the Dockerfile in the current directory.
+    # In a CI/CD pipeline, this would be replaced by `image: registry/trading_app:latest`.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trading_app:latest
+    container_name: trading_app
+    
+    # Load all configuration from the .env file.
+    # This prevents hardcoding secrets and allows for environment-specific settings.
+    env_file:
+      - .env
+
+    # Connect this container to the existing external network.
+    # This is the MANDATORY integration point with the rest of the platform.
+    networks:
+      - central-data-platform
+
+    # Map the container's internal port 8000 to the host's port 8001.
+    # Nginx will proxy requests from the public internet to localhost:8001.
+    ports:
+      - "127.0.0.1:8001:8000" # Bind to localhost only for security
+
+    # Production-ready restart policy.
+    # Ensures the service comes back online after a reboot or unexpected crash.
+    restart: unless-stopped
+
+    # The Dockerfile's ENTRYPOINT already handles waiting for pgbouncer.
+    # No 'command' or 'entrypoint' override is needed here.
+    # The healthcheck is also defined in the Dockerfile.
+
+# Define the external network so Docker Compose knows it exists
+# and doesn't try to create it.
+networks:
+  central-data-platform:
+    external: true
