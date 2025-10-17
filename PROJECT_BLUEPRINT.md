@@ -1,41 +1,40 @@
 
-# <!-- FILENAME: PROJECT_BLUEPRINT.md -->
-# PROJECT BLUEPRINT: Trading App Web Service
-
+# <!-- FILENAME: PROJECT_BLUEPRINT_RUNTIME.md -->
+# PROJECT BLUEPRINT (RUNTIME): Trading App Web Service
 <!-- 
-This document is the canonical source of truth for the Trading App project.
-It is a living document and MUST be updated at the conclusion of each development phase.
-Provide the latest version of this file at the start of every new AI development session.
+This document is the canonical source of truth for the Trading App's runtime architecture.
+It describes the system as it currently exists in its production-ready state.
+Provide this file at the start of any AI session focused on troubleshooting, modification, or analysis.
 -->
 
-- **Version:** 2.0.0
+- **Version:** 1.0.0
 - **Status:** Production Ready
-- **Change Log (v2.0.0):** Completed Phase 4 and all planned development. The application is fully orchestrated and has an automated deployment script.
-- **Change Log (v1.5.0):** Completed Phase 3. Delivered end-to-end user features for Transactions (CRUD) and AI Chat.
-- **Change Log (v1.4.0):** Completed Phase 2. Integrated the Librarian RAG service and built the foundational React frontend shell.
-- **Change Log (v1.3.0):** Completed Phase 1. Implemented JWT-based authentication and CRUD endpoints for the backend user core.
-- **Change Log (v1.2.0):** Completed Phase 0, Step 0.2. Integrated Alembic for database migrations and defined initial SQLAlchemy models.
-- **Change Log (v1.1.0):** Completed Phase 0, Step 0.1. Established foundational project structure including directories, dependency management (`pyproject.toml`), and a multi-stage `Dockerfile`.
-- **Change Log (v1.0.0):** Initial blueprint creation. Establishes the full project scope, architecture, and phased implementation plan based on the analysis of the existing cloud ecosystem.
 
 ---
 
-## 1. System Overview & Core Purpose
+## 1. System Overview
 
-This project is to build the **Trading App**, a secure, user-facing web service that acts as the primary interface for an existing, sophisticated backend data pipeline and RAG (Retrieval-Augmented Generation) service.
+This system is a secure, user-facing web service that acts as the primary interface for an existing backend data pipeline and RAG (Retrieval-Augmented Generation) service. It provides users with features for portfolio management, trade journaling, and AI-powered analysis.
 
-Its purpose is not to reinvent the backend, but to **integrate seamlessly** into the existing production environment on the `shared-prod-vm-database` OCI VM. It will provide users with features for portfolio management, trade journaling, and AI-powered analysis while strictly adhering to the established architectural patterns of the ecosystem.
+The architecture is a containerized full-stack application, orchestrated by Docker Compose. It is designed for seamless integration into the existing `shared-prod-vm-database` cloud environment.
 
-## 2. Guiding Principles
+### 1.1. Ecosystem Glossary
+- **The Trading App (This System):** The full-stack application described in this document. It is the **primary user interface** for portfolio data and AI-driven insights. It is a **consumer** of data from the Data Pipeline and the Librarian Service.
+- **The Data Pipeline (External Provider):** An existing, high-throughput system responsible for ingesting and persisting market data. The Trading App treats this as a **read-only source of truth** for market information (e.g., `ohlc`, `instruments`).
+- **The Librarian Service (External Provider):** The centralized, production-grade RAG API. The Trading App is a **thin client** to this service; all complex RAG query logic is offloaded to the Librarian.
+- **PgBouncer (Infrastructure):** The mandatory connection pooler for all PostgreSQL database interactions. All services, including the Trading App, **MUST** connect through it.
 
-These principles govern all development decisions and AI-generated code:
 
-1.  **Ecosystem Integration:** Adhere to all documented patterns (PgBouncer, shared Docker network, etc.). The application is a guest in an existing system.
-2.  **Backend Robustness:** Prioritize a well-designed, secure, and testable API. The frontend can be simple initially but must be built on this solid foundation.
+---
 
-## 3. Core Architecture
+## 2. Core Architecture & Principles
 
-The Trading App is a containerized FastAPI application co-located with the existing database and services on a single VM.
+### 2.1. Guiding Principles
+1.  **Ecosystem Integration:** The application is a guest in a larger ecosystem. It **MUST** adhere to all documented patterns (PgBouncer, shared Docker network).
+2.  **API-Driven & Decoupled:** The frontend and backend are decoupled. The backend API is the **sole authority** on business logic and data state. The frontend is a pure-state renderer that reacts to the API.
+
+### 2.2. Architectural Diagram
+The Trading App is a containerized FastAPI application and React frontend, co-located with existing services on a single VM and connected via a shared Docker network. Nginx acts as a reverse proxy and secure entry point.
 
 ```
 +-------------------------------------------------------------------------+
@@ -43,7 +42,7 @@ The Trading App is a containerized FastAPI application co-located with the exist
 |                                                                         |
 |  +---------------------------+       +--------------------------------+ |
 |  | Nginx (Reverse Proxy)     |<----->| Static Frontend (React Files)  | |
-|  | - SSL Termination         |       | (Hosted on OCI Object Storage) | |
+|  | - SSL Termination         |       | (Served by Nginx)              | |
 |  | - Rate Limiting           |       +--------------------------------+ |
 |  +------------+--------------+                                          |
 |               |                                                         |
@@ -51,7 +50,7 @@ The Trading App is a containerized FastAPI application co-located with the exist
 |  | Docker Network (`central-data-platform`)                          |  |
 |  |                                                                   |  |
 |  | +-----------------+   /api/   +-----------------+                 |  |
-|  | | Nginx Container |<----------| Trading App API |                 |  |
+|  | | Nginx Container |<----------| trading_app_api |                 |  |
 |  | +-----------------+           | (FastAPI)       |                 |  |
 |  |                               +-------+---------+                 |  |
 |  |                                       |                           |  |
@@ -66,194 +65,131 @@ The Trading App is a containerized FastAPI application co-located with the exist
 +------------------------------------------------------------------------------------+
 ```
 
--   **Compute:** A single `trading_app` Docker container running on the existing OCI VM.
--   **Database Access (MANDATORY):** All connections MUST go through the `pgbouncer:6432` service.
--   **RAG Access (MANDATORY):** All AI context queries MUST be made via an API call to the existing `librarian` service.
+---
 
-## 4. Technology Stack
+## 3. Service Directory
 
--   **Backend:** Python 3.12+, FastAPI, SQLAlchemy 2.0 (async), Pydantic, Alembic
--   **Frontend:** React, Vite, Mantine, Zustand, Axios
--   **Databases:** PostgreSQL 17 (via PgBouncer), Redis
--   **DevOps:** Docker, Docker Compose, Nginx, Let's Encrypt
+### Service: `trading_app_api`
+- **Role:** The **authoritative backend service**. It is solely responsible for user authentication, business logic, data persistence for user-owned entities (transactions, portfolios), and acting as a secure proxy to other backend services (Librarian).
+- **Technology:** FastAPI (Python)
+- **Source Location:** `/app`
+- **Interacts With:**
+    - **Writes To:** PostgreSQL (`users`, `user_transactions`).
+    - **Reads From:** PostgreSQL (via `pgbouncer:6432`), Librarian Service (`librarian:port`).
+    - **Accessed By:** `nginx` (internally on port 8000).
+
+### Service: `trading_app_ui`
+- **Role:** A **pure client-side application**. Its sole responsibility is to render the user interface and communicate with the `trading_app_api` via its defined REST contract. It contains no business logic.
+- **Technology:** React (Vite)
+- **Source Location:** `/frontend`
+- **Interacts With:**
+    - **Reads From/Writes To:** `trading_app_api` via authenticated REST calls.
+- **Note:** This is a build-time artifact. The compiled static files (`/frontend/dist`) are served directly by `nginx`.
+
+### Service: `nginx`
+- **Role:** The **secure edge and traffic router**. It is the single entry point for all user traffic, responsible for SSL/TLS, security headers, and routing requests to the appropriate backend service.
+- **Technology:** Nginx
+- **Configuration:** `nginx.conf`
+- **Interacts With:**
+    - **Routes:** Forwards requests starting with `/api/` to `trading_app_api`. Serves static files from `/frontend/dist` for all other requests.
 
 ---
 
-## 5. Implementation Roadmap
 
-This plan is divided into sequential, verifiable phases. Update the status of each step upon completion.
+## 4. API Contract (`trading_app_api`)
 
-### **Phase 0: Project Foundation**
--   **Step 0.1: Project Scaffolding & Tooling**
-    -   **Status:** `complete`
-    -   **Objective:** Create the `trading_app` directory structure, `pyproject.toml`, and `Dockerfile`.
-    -   **Notes:** Established `app/` and `tests/` directories, configured dependencies in `pyproject.toml` for `uv`, and created a multi-stage, non-root `Dockerfile`.
+The `trading_app_api` provides the following versioned contract for its clients.
 
--   **Step 0.2: Implement Database Migrations**
-    -   **Status:** `complete`
-    -   **Objective:** Integrate Alembic to manage all database schema changes in a controlled, versioned manner.
-    -   **Notes:** Integrated Alembic for async operations, defined core SQLAlchemy models, and generated the initial versioned schema baseline.
+### 4.1. `POST /api/v1/auth/register`
+-   **Purpose:** Registers a new user.
+-   **Authentication:** None.
+-   **Request Body:** `{ "email": "string", "password": "string" }`
+-   **Success Response (201):** `{ "id": "uuid", "email": "string" }`
+
+### 4.2. `POST /api/v1/auth/login`
+-   **Purpose:** Authenticates a user and returns a JWT access token.
+-   **Authentication:** None.
+-   **Request Body:** `application/x-www-form-urlencoded`: `username=<email>&password=<password>`
+-   **Success Response (200):** `{ "access_token": "string", "token_type": "bearer" }`
+
+### 4.3. `GET /api/v1/transactions`
+-   **Purpose:** Retrieves all transactions for the currently authenticated user.
+-   **Authentication:** JWT Bearer Token required.
+-   **Success Response (200):** `[ { "id": "uuid", "symbol": "string", "amount": "float", ... } ]`
+
+### 4.4. `POST /api/v1/ai/chat`
+-   **Purpose:** Acts as a secure proxy to the Librarian RAG service.
+-   **Authentication:** JWT Bearer Token required.
+-   **Request Body:** `{ "prompt": "string" }`
+-   **Success Response (200):** `{ "response": "string", "query_id": "uuid" }`
+---
+
+## 5. User Action Lifecycle (Example: Creating a Transaction)
+
+1.  **UI Interaction (Client):** A logged-in user fills out the "New Transaction" form in the `trading_app_ui` and clicks "Submit".
+2.  **API Call (Client -> Server):** The React application makes an authenticated `POST` request to `/api/v1/transactions` with the form data as the JSON payload and the user's JWT in the `Authorization` header.
+3.  **Authentication (Server):** The `trading_app_api` receives the request. A FastAPI dependency validates the JWT, identifies the user, and injects the user object into the request context. If the token is invalid, a `401 Unauthorized` is returned.
+4.  **Business Logic (Server):** The API endpoint logic validates the incoming transaction data (Pydantic schema).
+5.  **Database Write (Server):** The service layer constructs a SQLAlchemy model instance and commits it to the PostgreSQL database via the `pgbouncer` connection.
+6.  **Response (Server -> Client):** The API returns a `201 Created` status with the newly created transaction object.
+7.  **UI Update (Client):** The React application receives the successful response and updates its local state, causing the new transaction to appear in the user's data table.
 
 ---
 
-### **Phase 1: Backend User Core**
-- **Status:** `complete`
-- **Objective:** Build the core API for user authentication and data management.
+## 6. Build System & Packaging
 
--   **Step 1.1: Database Models**
-    -   **Status:** `complete`
-    -   **Objective:** Define SQLAlchemy models for `users`, `user_transactions`, `user_portfolios`, and `ai_conversations`.
-    -   **Notes:** Established a scalable CRUD service pattern for the existing SQLAlchemy models.
-
--   **Step 1.2: API Endpoints**
-    -   **Status:** `complete`
-    -   **Objective:** Implement JWT-based registration/login and CRUD endpoints for user transactions.
-    -   **Notes:** Implemented JWT-based registration/login endpoints with bcrypt hashing and a dependency for securing routes.
+-   **Dependency Management:** Dependencies are managed in `pyproject.toml` and installed using `uv` for speed and reliability.
+-   **Containerization (`Dockerfile`):** The service is packaged as a Docker image using a multi-stage build.
+    -   **Stage 1 (Builder):** Installs dependencies to leverage Docker's layer caching.
+    -   **Stage 2 (Final):** Copies dependencies and source code into a minimal `python-slim` base image. The container runs as a non-root user (`appuser`) to adhere to the principle of least privilege.
 
 ---
 
-### **Phase 2: RAG Integration & Frontend Shell**
-- **Status:** `complete`
-- **Objective:** Connect the backend to the Librarian service and build the basic frontend structure.
+## 7. Operational Governance
 
--   **Step 2.1: Librarian Service Client**
-    -   **Status:** `complete`
-    -   **Objective:** Create a secure API client in the `trading_app` to communicate with the `librarian` service and create a proxy endpoint at `/ai/chat`.
-    -   **Notes:** Created a secure, async backend client and a `/api/v1/ai/chat` proxy endpoint to the Librarian service.
+### 7.1. Configuration
+- **Runtime Configuration (`.env`):** A single `.env` file at the project root contains all runtime environment variables for the service (e.g., `DATABASE_URL`, `LIBRARIAN_API_KEY`). This file is the **sole source of configuration** for a running container and is loaded via the `env_file` directive in `docker-compose.yml`.
 
--   **Step 2.2: Frontend Scaffolding**
-    -   **Status:** `complete`
-    -   **Objective:** Initialize a responsive React app with a persistent AI sidebar managed by Zustand.
-    -   **Notes:** Initialized a React/Vite project with Mantine for UI and Zustand for state, building the core AppLayout.
-
--   **Step 2.3: Legal & Consent Placeholders**
-    -   **Status:** `complete`
-    -   **Objective:** Create placeholder legal pages and a mandatory consent checkbox for user registration.
-    -   **Notes:** Implemented placeholder legal pages and a mandatory consent checkbox component for future form integration.
+### 7.2. Runbooks
+- **Canonical Deployment Method:** `bash deploy.sh`
+- **Database Migrations:** `docker-compose run --rm trading_app_api alembic revision ...`
+- **Log Inspection:** `docker-compose logs -f <service_name>`
 
 ---
 
-### **Phase 3: First Useful Features**
-- **Status:** `complete`
-- **Objective:** Deliver the first interactive features to the user.
+## 8. Known Failure Modes & Recovery
 
--   **Step 3.1: Frontend Transactions Feature**
-    -   **Status:** `complete`
-    -   **Objective:** Build the UI for users to create, view, and manage their manual trade entries.
-    -   **Notes:** Built a full CRUD interface for user transactions with a modal form and data table, connected via an authenticated API client.
+- **Failure Mode:** Application returns a "502 Bad Gateway" from Nginx.
+  - **Cause & Recovery:** The `trading_app_api` container is stopped, crashing, or unhealthy and not responding to requests from Nginx.
 
--   **Step 3.2: Frontend AI Chat Integration**
-    -   **Status:** `complete`
-    -   **Objective:** Connect the AI sidebar UI to the backend's `/ai/chat` endpoint to create a functional chat experience.
-    -   **Notes:** Connected the AI sidebar UI to the backend, enabling real-time chat functionality managed by a dedicated Zustand store.
+- **Failure Mode:** Frontend UI loads, but API calls fail with a `401 Unauthorized` error.
+  - **Likely Cause:** The JWT stored in the browser's local storage is expired, invalid, or missing.
+  - **Recovery:** Instruct the user to log out and log back in to acquire a fresh token. Check the `trading_app_api` logs for any authentication errors.
 
----
+- **Failure Mode:** AI Chat feature returns "An error occurred".
+  - **Likely Cause:**
+      1. The `librarian` service is down or unreachable.
+      2. The `LIBRARIAN_API_KEY` in the `.env` file is missing or invalid.
+  - **Recovery:**
+    1.  Check the `trading_app_api` logs (`docker-compose logs -f trading_app_api`) for errors related to `/api/v1/ai/chat`.
+    2.  Verify the `LIBRARIAN_API_KEY` is set correctly in the `.env` file.
+    3.  From within the API container, check connectivity: `docker-compose exec trading_app_api ping librarian`.
 
-### **Phase 4: Orchestration & Deployment**
-- **Status:** `complete`
-- **Objective:** Containerize and configure the application for deployment on the target VM.
+- **Failure Mode:** The `trading_app_api` service fails to start, logging database connection errors.
+  - **Likely Cause:**
+      1. The `pgbouncer` service is down or unreachable on the `central-data-platform` network.
+      2. The `DATABASE_URL` in the `.env` file is incorrect.
+      3. The Docker `central-data-platform` network is not attached or configured correctly.
+  - **Recovery:**
+    1.  Verify the `DATABASE_URL` in the `.env` file is correct.
+    2.  Check the status of the `pgbouncer` container.
+    3.  From within the API container, attempt to connect to the database host: `docker-compose exec trading_app_api ping pgbouncer`.
 
--   **Step 4.1: Docker Compose Integration**
-    -   **Status:** `complete`
-    -   **Objective:** Create a `docker-compose.yml` that correctly connects the `trading_app` to the `central-data-platform` network.
-    -   **Notes:** Created a `docker-compose.yml` to orchestrate the service and connect to the external `central-data-platform` network.
-
--   **Step 4.2: Nginx Configuration**
-    -   **Status:** `complete`
-    -   **Objective:** Configure Nginx as a reverse proxy with SSL for the API and static frontend.
-    -   **Notes:** Created a production-grade `nginx.conf` for reverse proxy, SSL termination, and security headers.
-
--   **Step 4.3: Deployment Script**
-    -   **Status:** `complete`
-    -   **Objective:** Create a `deploy.sh` script to automate the entire build and deployment process.
-    -   **Notes:** Created a `deploy.sh` script with error handling to automate the full build, migration, and deployment sequence.
-
----
-
-## 6. Architectural Decision Records (ADR)
-
-This section records significant architectural decisions made during development that may deviate from the initial plan.
-
--   **ADR-001: Mandatory Use of Alembic for Migrations**
-    -   **Status:** `Accepted`
-    -   **Context:** The project requires a robust method for applying schema changes to a production database without data loss. Direct `ALTER TABLE` commands are forbidden by existing patterns.
-    -   **Decision:** We will use Alembic as the official tool for all database migrations. The initial schema will be created via an Alembic script, not a raw `.sql` file.
-    -   **Consequences:** Increased initial setup complexity but provides long-term safety, version control for the database schema, and repeatability.
-
--   **ADR-002: Pydantic for Type-Safe Configuration**
-    -   **Status:** `Accepted`
-    -   **Context:** The application requires a secure, reliable, and type-safe method for managing configuration, especially secrets like the database URL, which must be loaded from the environment.
-    -   **Decision:** We will use Pydantic's `BaseSettings` class as the sole mechanism for loading and accessing application configuration. All configuration values will be sourced from environment variables.
-    -   **Consequences:** This eliminates hardcoded secrets, provides automatic type validation on application startup, and improves the developer experience via autocompletion and clear schema definition in `app.core.config`.
-
-## 7. System Interface Contracts
-
-This section defines the stable interfaces this `trading_app` service consumes from the surrounding ecosystem. It is the definitive guide for how our application interacts with its neighbors, eliminating the need to consult their internal blueprints.
-
-### 7.1. Librarian Service (RAG) Interface
-The `trading_app` acts as a client to the central Librarian service for all RAG queries.
-
--   **Hostname (within Docker network):** `librarian`
--   **Endpoint:** `POST /api/v1/context`
--   **Authentication:** `X-API-KEY` header containing the shared secret.
--   **Request Body (`application/json`):**
-    ```json
-    {
-      "project_name": "string",
-      "branch_name": "string",
-      "query": "string",
-      "max_results": "integer",
-      "filters": { "key": "value" }
-    }
-    ```
--   **Success Response Body (`200 OK`):**
-    ```json
-    {
-      "query_id": "uuid",
-      "context": [
-        {
-          "content": "string",
-          "metadata": {
-            "file_path": "string",
-            "start_line": "integer"
-          },
-          "score": "float"
-        }
-      ],
-      "processing_time_ms": "integer"
-    }
-    ```
-
-### 7.2. Data Pipeline (Read-Only) Interface
-The `trading_app` has read-only access to specific tables populated by the existing V2.5 data pipeline. The following table schemas are guaranteed to be available.
-
--   **Table: `instruments`**
-    -   `id`: `integer` (Primary Key)
-    -   `symbol`: `text` (e.g., 'BTC-PERPETUAL')
-    -   `exchange`: `text` (e.g., 'deribit')
-    -   `asset_type`: `text` (e.g., 'future', 'spot')
-    -   `is_active`: `boolean`
-
--   **Table: `ohlc` (1-minute bars)**
-    -   `instrument_id`: `integer` (Foreign Key to `instruments.id`)
-    -   `timestamp`: `timestamptz`
-    -   `open`: `numeric`
-    -   `high`: `numeric`
-    -   `low`: `numeric`
-    -   `close`: `numeric`
-    -   `volume`: `numeric`
-
--   **Table: `public_trades`**
-    -   `instrument_id`: `integer` (Foreign Key to `instruments.id`)
-    -   `timestamp`: `timestamptz`
-    -   `price`: `numeric`
-    -   `amount`: `numeric`
-    -   `side`: `text` ('buy' or 'sell')
-
-### 7.3. Infrastructure & Host Interface
-These are the non-negotiable connection parameters for the host environment.
-
--   **Database Host:** `pgbouncer`
--   **Database Port:** `6432`
--   **Shared Docker Network:** `central-data-platform`
--   **Host Architecture:** `linux/arm64`
+- **Failure Mode:** The AI Chat feature returns "An error occurred" messages on the frontend.
+  - **Likely Cause:**
+      1. The `librarian` service is down or unreachable.
+      2. The `LIBRARIAN_API_KEY` in the `.env` file is missing or invalid.
+  - **Recovery:**
+    1.  Check the `trading_app_api` logs (`docker-compose logs -f trading_app_api`) for errors related to `/api/v1/ai/chat`.
+    2.  Verify the `LIBRARIAN_API_KEY` is set correctly in the `.env` file.
+    3.  From within the API container, check connectivity: `docker-compose exec trading_app_api ping librarian`.
