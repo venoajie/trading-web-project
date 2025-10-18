@@ -39,10 +39,10 @@ COPY --from=builder ${UV_VENV} ${UV_VENV}
 
 # Copy the application code and the wait script
 # Set ownership to the non-root user
-COPY --chown=appuser:appuser ./app ./app
-COPY --chown=appuser:appuser ./alembic ./alembic
-COPY --chown=appuser:appuser alembic.ini .
-COPY --chown=appuser:appuser wait-for.sh /usr/local/bin/wait-for.sh
+COPY --chown=appuser:appuser ./trading_app/app ./app
+COPY --chown=appuser:appuser ./trading_app/alembic ./alembic
+COPY --chown=appuser:appuser ./alembic.ini .
+COPY --chown=appuser:appuser ./wait-for.sh /usr/local/bin/wait-for.sh
 RUN chmod +x /usr/local/bin/wait-for.sh
 
 # Switch to the non-root user
