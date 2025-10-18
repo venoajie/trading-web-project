@@ -20,7 +20,7 @@ dependencies = [
     "redis==5.0.4",
     # Security - JWTs and password hashing
     "python-jose[cryptography]==3.3.0",
-    "passlib[bcrypt]==2024.7.1",
+    "passlib[bcrypt]~=2024.7.1",
 ]
 
 [project.optional-dependencies]
